@@ -208,3 +208,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 modules/EC2/.terraform.lock.hcl
+environments/dev/.terraform.lock.hcl
+environments/prod/.terraform.lock.hcl
+environments/stage/.terraform.lock.hcl
