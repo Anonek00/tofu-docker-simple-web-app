@@ -1,0 +1,31 @@
+# Global settings
+global:
+  scrape_interval: 15s      # Frequency of metrics gathering
+  evaluation_interval: 15s  # Frequency of rules check
+
+# Scraping config - Where prometheus should look for metrics
+scrape_configs:
+  # Prometheus meusures itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Prometheus meusures Node.js Express application
+  - job_name: 'nodejs-app'
+    static_configs:
+      - targets: ['webapp:3500']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+
+  # Prometheus mesures MySQL Exporter
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysql_exporter:9104']
+    scrape_interval: 5s
+
+  # Prometheus mesures Redis Exporter
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval:  5s
