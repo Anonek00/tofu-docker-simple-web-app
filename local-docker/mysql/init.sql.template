@@ -1,0 +1,42 @@
+-- Init script for MySQL Database
+-- Automatic deploy on first start
+
+-- Create application user
+CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';
+
+-- Create exporter user
+CREATE USER IF NOT EXISTS '${MYSQL_EXPORTER_USER}'@'%' IDENTIFIED BY '${MYSQL_EXPORTER_PASSWORD}';
+GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO '${MYSQL_EXPORTER_USER}'@'%';
+
+FLUSH PRIVILEGES;
+
+USE nodeapp;
+
+-- Add users table
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_email (email),
+    INDEX idx_created_at (created_at)
+);
+
+-- Add sample users
+INSERT IGNORE INTO users (name, email) VALUES 
+('Jeffrey Mathis', 'JeffreyMathis@dayrep.com'),
+('Melodi Lee', 'MelodiLee@jourrapide.com'),
+('April Dennis', 'AprilDennis@dayrep.com');
+
+-- Add table for app logs
+CREATE TABLE IF NOT EXISTS app_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    level VARCHAR(20) NOT NULL,
+    message TEXT NOT NULL,
+    metadata JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_level (level),
+    INDEX idx_created_at (created_at)
+);
