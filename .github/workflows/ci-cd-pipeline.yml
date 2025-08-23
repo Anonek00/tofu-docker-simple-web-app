@@ -277,7 +277,7 @@ jobs:
   summary:
     name: 📋 Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [validate-environments, docker-build-test, generate-docs]
+    needs: [validate-environments, docker-build-test]
     if: always()
     
     steps:
