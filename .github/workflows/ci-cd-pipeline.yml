@@ -65,3 +65,200 @@ jobs:
           echo "${{ matrix.environment }} validated successfully"
 
 
+  # JOB 2: DOCKER BUILD AND TEST WITH COMPOSE
+  docker-build-test:
+    name: Docker Build & Integration Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./local-docker/app
+          file: ./local-docker/app/.dockerfile
+          push: false
+          load: true
+          tags: test-app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Generate MySQL init.sql from template
+        working-directory: ./local-docker/mysql
+        run: |
+
+          echo "Generating init.sql"
+          envsubst < init.sql.template > init.sql
+
+      # Full stack test with docker-compose to fix issues with connecting to database
+      - name: Test application with docker-compose
+        working-directory: ./local-docker/app
+        run: |
+          echo "Testing complete application stack..."
+          
+          # Build and run whole stack in background
+          docker compose up --build -d
+          
+          # Wait for all services to start
+          echo "Waiting for services to start..."
+          sleep 30
+          
+          # Check all containers status
+          echo "Checking container status..."
+          docker compose ps
+          
+          # Check if all containers are working
+          if ! docker compose ps | grep -E "(Up|healthy)"; then
+            echo "Some containers failed to start"
+            echo "Logs from failed containers:"
+            docker compose logs
+            exit 1
+          fi
+          
+          # Test health check
+          echo "Testing application health..."
+          max_attempts=10
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            if curl -f http://localhost:3500/health; then
+              echo "Application health check passed"
+              break
+            else
+              echo "Attempt $attempt/$max_attempts failed, waiting 5s..."
+              sleep 5
+              attempt=$((attempt + 1))
+            fi
+          done
+          
+          if [ $attempt -gt $max_attempts ]; then
+            echo "Application health check failed after $max_attempts attempts"
+            echo "Application logs:"
+            docker compose logs webapp
+            exit 1
+          fi
+          
+          # Basic endpoints testing
+          echo "Testing API endpoints..."
+          
+          # Main page test
+          if curl -f http://localhost/; then
+            echo "Main page test passed"
+          else
+            echo "Main page test failed"
+            exit 1
+          fi
+          
+          # Users endpoint test
+          if curl -f http://localhost/users; then
+            echo "Users endpoint test passed"
+          else
+            echo "Users endpoint test failed (may be expected)"
+          fi
+          
+          # Database connectivity test
+          echo "Testing database connectivity..."
+          if docker compose exec -T mysql mysql -u ${MYSQL_USER} -p${MYSQL_PASSWORD} -e "SELECT 1;"; then
+            echo "Database connectivity test passed"
+          else
+            echo "Database connectivity test failed"
+            docker compose logs mysql
+            exit 1
+          fi
+          
+          # Redis connectivity test
+          echo "Testing Redis connectivity..."
+          if docker compose exec -T redis redis-cli ping; then
+            echo "Redis connectivity test passed"
+          else
+            echo "Redis connectivity test failed"
+            docker compose logs redis
+            exit 1
+          fi
+          
+          echo "All integration tests passed!"
+
+      - name: Cleanup test environment
+        if: always()
+        working-directory: ./local-docker/app
+        run: |
+          echo "Cleaning up test environment..."
+          docker compose down -v
+          docker system prune -f
+
+      # Image security scan
+      - name: Security Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'test-app:latest'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Extract metadata for push
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Push Docker Image
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Logging in to GitHub Container Registry..."
+          echo ${{ secrets.DEPLOYMENT_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          IMAGE_NAME="ghcr.io/anonek00/anonekoolocalenv"
+          IMAGE_TAG="${{ github.sha }}"
+          SHORT_TAG=${IMAGE_TAG:0:7}
+          
+          echo "Tagging image as $IMAGE_NAME:$SHORT_TAG"
+          docker tag test-app:latest $IMAGE_NAME:$SHORT_TAG
+          
+          echo "Pushing image $IMAGE_NAME:$SHORT_TAG"
+          docker push $IMAGE_NAME:$SHORT_TAG
+          
+          echo "Image pushed successfully with tag: $SHORT_TAG"
+
+
+      - name: Generate Test Report
+        if: always()
+        run: |
+          echo "## Integration Test Results" >> test-report.md
+          echo "" >> test-report.md
+          echo "**Test Date:** $(date)" >> test-report.md  
+          echo "**Image:** test-app:latest" >> test-report.md
+          echo "" >> test-report.md
+          echo "### Tests Performed:" >> test-report.md
+          echo "- Docker Compose stack startup" >> test-report.md
+          echo "- Application health check" >> test-report.md
+          echo "- API endpoint tests" >> test-report.md
+          echo "- Database connectivity" >> test-report.md
+          echo "- Redis connectivity" >> test-report.md
+          echo "- Security vulnerability scan" >> test-report.md
+
+      - name: Upload Test Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-report
+          path: test-report.md
+
+
