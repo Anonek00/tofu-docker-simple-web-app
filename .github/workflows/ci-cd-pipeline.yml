@@ -273,3 +273,84 @@ jobs:
           path: test-report.md
 
 
+    # JOB 3: PIPELINE SUMMARY
+  summary:
+    name: 📋 Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [validate-environments, docker-build-test, generate-docs]
+    if: always()
+    
+    steps:
+      - name: Generate Pipeline Summary Report
+        run: |
+          # Basic header
+          echo "# 🚀 Pipeline Report" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }} | **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.event_name }} by @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Job status table
+          echo "## 📊 Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          
+          # Check each job result
+          TOFU_STATUS="${{ needs.validate-environments.result }}"
+          DOCKER_STATUS="${{ needs.docker-build-test.result }}"
+          DOCS_STATUS="${{ needs.generate-docs.result }}"
+          
+          # Add status rows
+          case $TOFU_STATUS in
+            "success") echo "| 🌍 Tofu Environments | ✅ PASSED | All environments validated |" >> $GITHUB_STEP_SUMMARY ;;
+            "failure") echo "| 🌍 Tofu Environments | ❌ FAILED | Check Tofu configuration |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| 🌍 Tofu Environments | ⏭️ SKIPPED | Job was skipped |" >> $GITHUB_STEP_SUMMARY ;;
+          esac
+          
+          case $DOCKER_STATUS in
+            "success") echo "| 🐳 Docker Build & Test | ✅ PASSED | Container built successfully |" >> $GITHUB_STEP_SUMMARY ;;
+            "failure") echo "| 🐳 Docker Build & Test | ❌ FAILED | Check Docker configuration |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| 🐳 Docker Build & Test | ⏭️ SKIPPED | Job was skipped |" >> $GITHUB_STEP_SUMMARY ;;
+          esac
+          
+          case $DOCS_STATUS in
+            "success") echo "| 📚 Documentation | ✅ PASSED | README updated |" >> $GITHUB_STEP_SUMMARY ;;
+            "failure") echo "| 📚 Documentation | ❌ FAILED | Documentation generation failed |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| 📚 Documentation | ⏭️ SKIPPED | Not main branch |" >> $GITHUB_STEP_SUMMARY ;;
+          esac
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Overall status and next steps
+          if [[ "$TOFU_STATUS" == "success" && "$DOCKER_STATUS" == "success" ]]; then
+            echo "## ✅ Pipeline SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "All critical jobs passed! Application is ready for deployment. 🚀" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$TOFU_STATUS" == "failure" ]]; then
+            echo "## ❌ Infrastructure FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "**Fix:** Check Tofu syntax and variables. Run \`tofu validate\` locally." >> $GITHUB_STEP_SUMMARY
+          elif [[ "$DOCKER_STATUS" == "failure" ]]; then
+            echo "## ❌ Docker Build FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "**Fix:** Check Docker configuration. Run \`docker compose up --build\` locally." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ⚠️ Partial Success" >> $GITHUB_STEP_SUMMARY
+            echo "Some jobs failed or were skipped. Review individual job logs." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Quick links
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Quick Links:** [Workflow Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) | [Repository](https://github.com/${{ github.repository }})" >> $GITHUB_STEP_SUMMARY
+          echo "*Generated at $(date)*" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set Status Notification
+        run: |
+          TOFU_STATUS="${{ needs.validate-environments.result }}"
+          DOCKER_STATUS="${{ needs.docker-build-test.result }}"
+          
+          if [[ "$TOFU_STATUS" == "success" && "$DOCKER_STATUS" == "success" ]]; then
+            echo "::notice title=Success::✅ All jobs passed! Ready for deployment."
+          elif [[ "$TOFU_STATUS" == "failure" ]]; then
+            echo "::error title=Tofu Failed::❌ Infrastructure validation failed."
+          elif [[ "$DOCKER_STATUS" == "failure" ]]; then
+            echo "::error title=Docker Failed::❌ Docker build/test failed."
+          else
+            echo "::warning title=Issues::⚠️ Some jobs failed or were cancelled."
+          fi
