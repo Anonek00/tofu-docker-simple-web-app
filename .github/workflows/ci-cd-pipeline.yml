@@ -14,7 +14,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  MYSQL_DATABASE: ${{ variables.MYSQL_DATABASE }}
+  MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
   MYSQL_USER: ${{ secrets.MYSQL_USER }}
   MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
   MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
@@ -23,8 +23,8 @@ env:
   MYSQL_EXPORTER_USER: ${{ secrets.MYSQL_EXPORTER_USER }}
   MYSQL_EXPORTER_PASSWORD: ${{ secrets.MYSQL_EXPORTER_PASSWORD }}
   REDIS_PASSWORD: 
-  NODE_ENV: ${{ variables.NODE_ENV }}
-  APP_PORT: ${{ variables.APP_PORT }}
+  NODE_ENV: ${{ vars.NODE_ENV }}
+  APP_PORT: ${{ vars.APP_PORT }}
 
 jobs:
     # JOB 1: VALIDATE TOFU ENVIRONMENTS
