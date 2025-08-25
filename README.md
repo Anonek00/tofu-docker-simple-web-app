@@ -312,11 +312,11 @@ validate-environments (matrix: dev,stage,prod) → docker-build-test → summary
 - **Consistency** - standardized structure across projects
 
 ### AWS Infra desired structure
-  <img src='.github/AWS_Infra_diagram.svg' alt='AWS Diagram' style='max-width: 100%; height: auto;'' />
+  <img src=".github/AWS_Infra_diagram.svg" alt="AWS Diagram" style="max-width: 100%; height: auto;" />
 
 
 ### Docker application structure
-  <img src='.github/Docker-compose_diagram.svg' alt='Docker Compose structure Diagram' style='max-width: 100%; height: auto;'' />
+  <img src=".github/Docker-compose_diagram.svg" alt="Docker Compose structure Diagram" style="max-width: 100%; height: auto;" />
 
 ## 🔄 CI/CD Pipeline
 
@@ -345,5 +345,5 @@ The project uses **GitHub Actions** for automated CI/CD:
 - **Environments**: 3 deployment environments
 - **Application**: docker-express-nodejs-app
 
-**🤖 Auto-generated on:** `Mon Aug 25 19:49:26 UTC 2025`
+**🤖 Auto-generated on:** `Mon Aug 25 19:59:04 UTC 2025`
 **📋 Last updated by:** GitHub Actions Bot
