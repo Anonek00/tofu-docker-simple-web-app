@@ -744,11 +744,11 @@ jobs:
           echo "- **Consistency** - standardized structure across projects" >> README.md
           echo "" >> README.md
           echo "### AWS Infra desired structure" >> README.md
-          echo "  <img src='.github/AWS_Infra_diagram.svg' alt='AWS Diagram' style='max-width: 100%; height: auto;'' />" >> README.md  
+          echo '  <img src=".github/AWS_Infra_diagram.svg" alt="AWS Diagram" style="max-width: 100%; height: auto;" />' >> README.md  
           echo "" >> README.md
           echo "" >> README.md
           echo "### Docker application structure" >> README.md
-          echo "  <img src='.github/Docker-compose_diagram.svg' alt='Docker Compose structure Diagram' style='max-width: 100%; height: auto;'' />" >> README.md  
+          echo '  <img src=".github/Docker-compose_diagram.svg" alt="Docker Compose structure Diagram" style="max-width: 100%; height: auto;" />' >> README.md  
           echo "" >> README.md
           
           # CI/CD Pipeline
