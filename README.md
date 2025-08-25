@@ -312,10 +312,14 @@ validate-environments (matrix: dev,stage,prod) → docker-build-test → generat
 - **Zero maintenance** - no manual documentation updates
 - **Consistency** - standardized structure across projects
 
-### Project Structure
+### AWS Infra desired structure
 
   <img src=".github/AWS_Infra_diagram.svg" alt="AWS Diagram" style="max-width: 100%; height: auto;" />
-Figure 1: Architecture Overview
+
+### Docker application structure
+
+  <img src=".github/Docker-compose_diagram.svg" alt="Docker Compose structure Diagram" style="max-width: 100%; height: auto;" />
+
 
 ## 🔄 CI/CD Pipeline
 
