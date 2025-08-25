@@ -770,7 +770,6 @@ jobs:
           echo "### Monitoring:" >> README.md
           echo "- All tests must pass before merge" >> README.md
           echo "- Security scans with Trivy and TfSec" >> README.md
-          echo "- Infrastructure tests with Terratest" >> README.md
           echo "" >> README.md
           
           # Footer with dynamic stats
