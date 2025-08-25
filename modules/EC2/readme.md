@@ -1,0 +1,3 @@
+# EC2 Module description
+
+This module provisions one or more Amazon Linux 2 instances in specified subnets and security groups. Each instance is initialized with a startup script that updates the system, installs Docker and Docker Compose, and prepares a dedicated application directory and user (nodeapp) for running containerized workloads. The module tags the instances with environment-specific labels and outputs their IDs, public/private IPs, and DNS names for further use.
