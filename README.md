@@ -313,7 +313,9 @@ validate-environments (matrix: dev,stage,prod) → docker-build-test → generat
 - **Consistency** - standardized structure across projects
 
 ### Project Structure
-Project Structure diagram to be uploaded.
+
+  <img src=".github/AWS_Infra_diagram.svg" alt="AWS Diagram" style="max-width: 100%; height: auto;" />
+Figure 1: Architecture Overview
 
 ## 🔄 CI/CD Pipeline
 
