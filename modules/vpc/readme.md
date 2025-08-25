@@ -1,0 +1,3 @@
+# VPC Module description
+
+This module provisions a custom Virtual Private Cloud (VPC) with DNS support enabled, an Internet Gateway for external connectivity, and multiple public subnets distributed across availability zones. It configures a routing table that directs outbound traffic from these subnets to the Internet Gateway, ensuring internet access for resources like EC2 instances. The module also tags all resources with environment-specific labels and outputs the VPC ID, subnet IDs, and Internet Gateway ID for reuse by other modules.
