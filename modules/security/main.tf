@@ -28,14 +28,6 @@ resource "aws_security_group" "web" {
     cidr_blocks = var.allowed_ssh_cidrs
   }
 
-  ingress {
-    description = "Docker Compose ports"
-    from_port   = 3000
-    to_port     = 9000
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_inbound_cidrs
-  }
-
   # Outbound traffic - allow anything to anywhere
   egress {
     from_port   = 0

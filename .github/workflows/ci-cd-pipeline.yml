@@ -360,3 +360,460 @@ jobs:
           else
             echo "::warning title=Issues::⚠️ Some jobs failed or were cancelled."
           fi
+
+  # JOB 4: GENERATE DOCUMENTATION
+  generate-docs:
+    name: 📚 Generate Documentation
+    runs-on: ubuntu-latest
+    needs: [summary]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.DEPLOYMENT_TOKEN }}
+
+      - name: Generate comprehensive README
+        run: |
+          # Header
+          echo "# ${{ github.repository }}" > README.md
+          echo "" >> README.md
+          echo "🏗️ **Infrastructure as Code** project using **OpenTofu** for AWS infrastructure provisioning and **Docker** for containerized Node.js Express application with monitoring deployment." >> README.md
+          echo "" >> README.md
+          
+          # Table of Contents
+          echo "## 📋 Table of Contents" >> README.md
+          echo "- [Infrastructure Modules](#-infrastructure-modules)" >> README.md
+          echo "- [Environments](#-environments)" >> README.md
+          echo "- [Requirements](#-requirements--prerequisites)" >> README.md
+          echo "- [Local Development](#-how-to-run-the-project-locally)" >> README.md
+          echo "- [Deployment](#-step-by-step-deployment)" >> README.md
+          echo "- [Infrastructure Destruction](#-infrastructure-destruction)" >> README.md
+          echo "- [Technical Documentation](#-technical-documentation)" >> README.md
+          echo "- [CI/CD Pipeline](#-cicd-pipeline)" >> README.md
+          echo "" >> README.md
+          
+          # Infrastructure Modules with auto-discovery
+          echo "## 🏗️ Infrastructure Modules" >> README.md
+          echo "" >> README.md
+          if [ -d "modules/" ]; then
+            for module in modules/*/; do
+              module_name=$(basename "$module")
+              echo "### $module_name" >> README.md
+              if [ -f "$module/README.md" ]; then
+                head -3 "$module/README.md" | tail -1 >> README.md
+              else
+                echo "AWS infrastructure module for $module_name resources" >> README.md
+              fi
+              echo "" >> README.md
+            done
+          fi
+          
+          # Environments with status detection
+          echo "## 🌍 Environments" >> README.md
+          echo "" >> README.md
+          echo "| Environment | Status | Description |" >> README.md
+          echo "|-------------|--------|-------------|" >> README.md
+          for env in environments/*/; do
+            env_name=$(basename "$env")
+            # Check if terraform state exists
+            if [ -f "$env/terraform.tfstate" ] && [ -s "$env/terraform.tfstate" ]; then
+              status="✅ Deployed"
+            else
+              status="Not deployed - AWS not initialized"
+            fi
+            echo "| **$env_name** | $status | $env_name environment infrastructure |" >> README.md
+          done
+          echo "" >> README.md
+          
+          # Requirements with version detection
+          echo "## ⚙️ Requirements & Prerequisites" >> README.md
+          echo "" >> README.md
+          echo "### System Requirements:" >> README.md
+          
+          # Try to detect OpenTofu version requirement
+          TOFU_VERSION=$(grep -r "required_version" modules/ environments/ 2>/dev/null | head -1 | sed 's/.*">= *\([0-9.]*\)".*/\1/' || echo "1.10.0")
+          echo "- **OpenTofu**: \`>= $TOFU_VERSION\`" >> README.md
+          
+          # Docker version detection
+          DOCKER_VERSION=$(docker --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "28.3.2")
+          echo "- **Docker**: \`>= $DOCKER_VERSION\`" >> README.md
+          
+          # Docker Compose version detection
+          COMPOSE_VERSION=$(docker compose version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "2.39.1")
+          echo "- **Docker Compose**: \`>= $COMPOSE_VERSION\`" >> README.md
+          
+          # AWS CLI version detection
+          AWS_VERSION=$(aws --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1 || echo "2.28.13")
+          echo "- **AWS CLI**: \`>= $AWS_VERSION\` (for AWS authentication)" >> README.md
+          
+          # Python version detection
+          PYTHON_VERSION=$(python3 --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "3.13.7")
+          echo "- **Python**: \`>=$PYTHON_VERSION\` (for AWS CLI)" >> README.md
+          
+          echo "- **Git**: Latest version" >> README.md
+          echo "" >> README.md
+          
+          # AWS Authentication
+          echo "### AWS Authentication:" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "# Configure AWS credentials" >> README.md
+          echo "aws configure" >> README.md
+          echo "# OR use environment variables:" >> README.md
+          echo "export AWS_ACCESS_KEY_ID=\"your-access-key\"" >> README.md
+          echo "export AWS_SECRET_ACCESS_KEY=\"your-secret-key\"" >> README.md
+          echo "export AWS_DEFAULT_REGION=\"us-central-1\"" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          
+          # Local Development
+          echo "## 🚀 How to Run the Project Locally" >> README.md
+          echo "" >> README.md
+          echo "### 1. Clone the Repository" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "git clone https://github.com/${{ github.repository }}.git" >> README.md
+          echo "cd $(basename ${{ github.repository }})" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          echo "### 2. Start the Application Stack" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "# Navigate to application directory" >> README.md
+          echo "cd local-docker/app" >> README.md
+          echo "" >> README.md
+          echo "# Start all services (app, database, monitoring)" >> README.md
+          echo "docker compose up --build -d" >> README.md
+          echo "" >> README.md
+          echo "# Check services status" >> README.md
+          echo "docker compose ps" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          
+          # Access Services with dynamic detection
+          echo "### 3. Access Services" >> README.md
+          echo "- **Application**: http://localhost" >> README.md
+          echo "- **Health Check**: http://localhost/health" >> README.md
+          echo "- **Grafana**: http://localhost/grafana" >> README.md
+          
+          # Check for Grafana in docker-compose
+          if [ -f "local-docker/app/docker-compose.yml" ] && grep -q "grafana" local-docker/app/docker-compose.yml; then
+            echo "- **Grafana**: http://localhost/grafana" >> README.md
+          fi
+          
+          echo "" >> README.md
+          echo "### 4. Stop Services" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "docker compose down" >> README.md
+          echo "# Remove volumes (optional)" >> README.md
+          echo "docker compose down -v" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          
+          # Step-by-step Deployment
+          echo "## 📦 Step-by-Step Deployment" >> README.md
+          echo "" >> README.md
+          echo "### Infrastructure Deployment (AWS)" >> README.md
+          echo "" >> README.md
+          echo "!Remember to configure AWS CLI BEFORE!" >> README.md
+          echo "" >> README.md
+          echo "#### 1. Initialize Tofu for Choosen Environment" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "# Choose environment (dev/stage/prod)" >> README.md
+          echo "cd environments/dev" >> README.md
+          echo "" >> README.md
+          echo "# Initialize Tofu" >> README.md
+          echo "tofu init" >> README.md
+          echo "" >> README.md
+          echo "# Review planned changes" >> README.md
+          echo "tofu plan" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          echo "#### 2. Deploy Infrastructure" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "# Apply infrastructure changes" >> README.md
+          echo "tofu apply" >> README.md
+          echo "" >> README.md
+          echo "# Verify deployment" >> README.md
+          echo "tofu show" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          echo "#### 3. Application Deployment" >> README.md
+          echo "Attention! Due to lack of actual AWS infra, this step wasn't automized in the pipeline. For actual infra I would use Tofu provisioner to copy application & docker files to EC2 instance and there build docker image and launch docker compose." >> README.md
+          echo "" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "# Copy ./local-docker content to target EC2 instance" >> README.md
+          echo "scp -i ~/.ssh/proper_key_for_auth -v -C -r ./local-docker proper_user_name@EC2_INSTANCE_IP:/opt/node-composed" >> README.md
+          echo "" >> README.md
+          echo "# Verify copied files" >> README.md
+          echo "ssh -i ~/.ssh/proper_key_for_auth proper_user_name@EC2_INSTANCE_IP 'ls -la /opt/node-composed'" >> README.md
+          echo "" >> README.md
+          echo "#Build & run application with docker compose as service user" >> README.md
+          echo "ssh -i ~/.ssh/proper_key_for_auth proper_user_name@EC2_INSTANCE_IP 'sudo -u nodeapp bash -c \"cd /opt/node-composed/local-docker/app && docker compose up --build -d\"'" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          
+          # Infrastructure Destruction
+          echo "## 🔥 Infrastructure Destruction" >> README.md
+          echo "" >> README.md
+          echo "### Complete Local Environment Cleanup" >> README.md
+          echo "" >> README.md
+          echo "#### Quick Local Cleanup:" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "# Stop and remove all containers, networks, and volumes" >> README.md
+          echo "cd local-docker/app" >> README.md
+          echo "docker compose down -v" >> README.md
+          echo "" >> README.md
+          echo "# Remove all unused Docker resources" >> README.md
+          echo "docker system prune -af" >> README.md
+          echo "docker volume prune -f" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          echo "#### Complete Local Reset:" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "#!/bin/bash" >> README.md
+          echo "# complete-local-reset.sh - Nuclear option for local cleanup" >> README.md
+          echo "" >> README.md
+          echo "echo \"🧹 Starting complete local cleanup...\"" >> README.md
+          echo "" >> README.md
+          echo "# Stop all running containers" >> README.md
+          echo "cd local-docker/app" >> README.md
+          echo "docker compose down -v" >> README.md
+          echo "" >> README.md
+          echo "# Remove ALL Docker containers, images, networks, and volumes" >> README.md
+          echo "docker container prune -f" >> README.md
+          echo "docker image prune -af" >> README.md
+          echo "docker network prune -f" >> README.md
+          echo "docker volume prune -f" >> README.md
+          echo "docker system prune -af --volumes" >> README.md
+          echo "" >> README.md
+          echo "# Clean build cache" >> README.md
+          echo "docker builder prune -af" >> README.md
+          echo "" >> README.md
+          echo "echo \"✅ Local environment completely cleaned!\"" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          
+          # AWS Infrastructure Destruction
+          echo "### Complete AWS Infrastructure Destruction" >> README.md
+          echo "" >> README.md
+          echo "#### Single Environment Destruction:" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "# Navigate to specific environment" >> README.md
+          echo "cd environments/dev  # or stage/prod" >> README.md
+          echo "" >> README.md
+          echo "# Review what will be destroyed" >> README.md
+          echo "tofu plan -destroy" >> README.md
+          echo "" >> README.md
+          echo "# Destroy infrastructure" >> README.md
+          echo "tofu destroy -auto-approve" >> README.md
+          echo "" >> README.md
+          echo "# Clean local state files" >> README.md
+          echo "rm -rf .terraform/" >> README.md
+          echo "rm -f terraform.tfstate*" >> README.md
+          echo "rm -f .terraform.lock.hcl" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          echo "#### Complete Multi-Environment Destruction:" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "#!/bin/bash" >> README.md
+          echo "# destroy-all-environments.sh - Destroy all AWS infrastructure" >> README.md
+          echo "" >> README.md
+          echo "echo \"💥 WARNING: This will destroy ALL AWS infrastructure!\"" >> README.md
+          echo "read -p \"Type 'DESTROY' to continue: \" confirm" >> README.md
+          echo "" >> README.md
+          echo "if [ \"\$confirm\" != \"DESTROY\" ]; then" >> README.md
+          echo "  echo \"❌ Destruction cancelled\"" >> README.md
+          echo "  exit 1" >> README.md
+          echo "fi" >> README.md
+          echo "" >> README.md
+          echo "# Destroy environments in reverse order (prod -> stage -> dev)" >> README.md
+          echo "ENVIRONMENTS=(\"prod\" \"stage\" \"dev\")" >> README.md
+          echo "" >> README.md
+          echo "for env in \"\${ENVIRONMENTS[@]}\"; do" >> README.md
+          echo "  if [ -d \"environments/\$env\" ]; then" >> README.md
+          echo "    echo \"💥 Destroying \$env environment...\"" >> README.md
+          echo "    cd environments/\$env" >> README.md
+          echo "    " >> README.md
+          echo "    # Force unlock if state is locked" >> README.md
+          echo "    tofu force-unlock -force \$(tofu show -json 2>/dev/null | jq -r '.values.root_module.resources[].instances[].attributes.id // empty' | head -1) 2>/dev/null || true" >> README.md
+          echo "    " >> README.md
+          echo "    # Destroy infrastructure" >> README.md
+          echo "    tofu destroy -auto-approve -var-file=\"terraform.tfvars\"" >> README.md
+          echo "    " >> README.md
+          echo "    # Clean state files" >> README.md
+          echo "    rm -rf .terraform/" >> README.md
+          echo "    rm -f terraform.tfstate*" >> README.md
+          echo "    rm -f .terraform.lock.hcl" >> README.md
+          echo "    " >> README.md
+          echo "    cd ../../" >> README.md
+          echo "    echo \"✅ \$env environment destroyed\"" >> README.md
+          echo "  fi" >> README.md
+          echo "done" >> README.md
+          echo "" >> README.md
+          echo "echo \"🎉 All AWS infrastructure destroyed!\"" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          echo "#### Emergency Infrastructure Reset:" >> README.md
+          echo "\`\`\`bash" >> README.md
+          echo "#!/bin/bash" >> README.md
+          echo "# emergency-reset.sh - Last resort cleanup" >> README.md
+          echo "" >> README.md
+          echo "echo \"☢️ EMERGENCY RESET - This destroys EVERYTHING!\"" >> README.md
+          echo "echo \"This includes:\"" >> README.md
+          echo "echo \"- All AWS infrastructure across all environments\"" >> README.md
+          echo "echo \"- All local Docker resources\"" >> README.md
+          echo "echo \"- All Terraform state files\"" >> README.md
+          echo "echo \"\"" >> README.md
+          echo "read -p \"Are you absolutely sure? Type 'EMERGENCY' to continue: \" confirm" >> README.md
+          echo "" >> README.md
+          echo "if [ \"\$confirm\" != \"EMERGENCY\" ]; then" >> README.md
+          echo "  echo \"❌ Emergency reset cancelled\"" >> README.md
+          echo "  exit 1" >> README.md
+          echo "fi" >> README.md
+          echo "" >> README.md
+          echo "# 1. Stop all local services" >> README.md
+          echo "cd local-docker/app" >> README.md
+          echo "docker compose down -v 2>/dev/null || true" >> README.md
+          echo "docker system prune -af" >> README.md
+          echo "docker volume prune -f" >> README.md
+          echo "cd ../../" >> README.md
+          echo "" >> README.md
+          echo "# 2. Force destroy all Tofu environments" >> README.md
+          echo "for env in prod stage dev; do" >> README.md
+          echo "  if [ -d \"environments/\$env\" ]; then" >> README.md
+          echo "    cd environments/\$env" >> README.md
+          echo "    tofu destroy -auto-approve 2>/dev/null || true" >> README.md
+          echo "    rm -rf .terraform* terraform.tfstate*" >> README.md
+          echo "    cd ../../" >> README.md
+          echo "  fi" >> README.md
+          echo "done" >> README.md
+          echo "" >> README.md
+          echo "echo \"☢️ Emergency reset complete!\"" >> README.md
+          echo "echo \"Manual cleanup may be required:\"" >> README.md
+          echo "echo \"1. Check AWS Console for any remaining resources\"" >> README.md
+          echo "echo \"2. Clean GitHub Container Registry packages\"" >> README.md
+          echo "echo \"3. Review GitHub Actions artifacts\"" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "" >> README.md
+          
+          # Technical Documentation
+          echo "## 📖 Technical Documentation" >> README.md
+          echo "" >> README.md
+          echo "### Architecture Overview" >> README.md
+          echo "This project implements a **modern DevOps pipeline** with the following key components:" >> README.md
+          echo "" >> README.md
+          echo "- **Infrastructure as Code**: OpenTofu for AWS resource management" >> README.md
+          echo "- **Containerization**: Docker Compose for local development" >> README.md
+          echo "- **CI/CD Automation**: GitHub Actions for testing and deployment" >> README.md
+          echo "- **Multi-Environment Support**: Separate dev/stage/prod configurations" >> README.md
+          echo "- **Security Integration**: Automated vulnerability scanning" >> README.md
+          echo "- **Documentation as Code**: Auto-generated project documentation" >> README.md
+          echo "" >> README.md
+          echo "### Key Technical Decisions" >> README.md
+          echo "" >> README.md
+          echo "#### 🎯 **OpenTofu over Terraform**" >> README.md
+          echo "- **Open-source** alternative with better community governance" >> README.md
+          echo "- **No licensing concerns** for commercial use" >> README.md
+          echo "- **Full compatibility** with existing Terraform modules" >> README.md
+          echo "" >> README.md
+          echo "#### 🏗️ **Multi-Environment Structure**" >> README.md
+          echo "- **Environment isolation** - separate state and configurations" >> README.md
+          echo "- **Progressive deployment** - test in dev before production" >> README.md
+          echo "- **Risk mitigation** - failures don't cascade between environments" >> README.md
+          echo "" >> README.md
+          echo "#### 🐳 **Docker Compose for Development**" >> README.md
+          echo "- **Simplicity** - easier local development than Kubernetes" >> README.md
+          echo "- **Resource efficiency** - lower overhead for development" >> README.md
+          echo "- **CI/CD integration** - works seamlessly with GitHub Actions" >> README.md
+          echo "" >> README.md
+          echo "#### 🔄 **Sequential Pipeline with Strategic Parallelization**" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "validate-environments (matrix: dev,stage,prod) → docker-build-test → summary → generate-docs" >> README.md
+          echo "\`\`\`" >> README.md
+          echo "- **Fail fast** - validate infrastructure before expensive builds" >> README.md
+          echo "- **Resource optimization** - parallel environment validation" >> README.md
+          echo "- **Clear dependencies** - logical job progression" >> README.md
+          echo "" >> README.md
+          echo "#### 🧪 **Multi-Layer Testing Strategy**" >> README.md
+          echo "- **Tofu validation** - syntax and configuration checks" >> README.md
+          echo "- **Docker integration tests** - full application stack verification" >> README.md
+          echo "- **Security scanning** - TfSec + Trivy for vulnerabilities" >> README.md
+          echo "" >> README.md
+          echo "#### 📚 **Documentation as Code**" >> README.md
+          echo "- **Always up-to-date** - generated from actual codebase" >> README.md
+          echo "- **Zero maintenance** - no manual documentation updates" >> README.md
+          echo "- **Consistency** - standardized structure across projects" >> README.md
+          echo "" >> README.md
+          echo "### AWS Infra desired structure" >> README.md
+          echo "  <img src='.github/AWS_Infra_diagram.svg' alt='AWS Diagram' style='max-width: 100%; height: auto;'' />" >> README.md  
+          echo "" >> README.md
+          echo "" >> README.md
+          echo "### Docker application structure" >> README.md
+          echo "  <img src='.github/Docker-compose_diagram.svg' alt='Docker Compose structure Diagram' style='max-width: 100%; height: auto;'' />" >> README.md  
+          echo "" >> README.md
+          
+          # CI/CD Pipeline
+          echo "## 🔄 CI/CD Pipeline" >> README.md
+          echo "" >> README.md
+          echo "The project uses **GitHub Actions** for automated CI/CD:" >> README.md
+          echo "" >> README.md
+          echo "### Pipeline Stages:" >> README.md
+          echo "1. **🧩 Infrastructure Validation** - Validate Tofu modules and environments" >> README.md
+          echo "2. **🐳 Docker Build & Test** - Build application, run integration tests" >> README.md
+          echo "3. **📚 Documentation** - Auto-generate and update README.md" >> README.md
+          echo "4. **📋 Summary** - Pipeline results and status" >> README.md
+          echo "" >> README.md
+          echo "### Triggers:" >> README.md
+          echo "- **Push** to \`main\` or \`develop\` branches" >> README.md
+          echo "- **Pull Requests** to \`main\` branch" >> README.md
+          echo "- **Manual trigger** via workflow dispatch" >> README.md
+          echo "" >> README.md
+          echo "### Monitoring:" >> README.md
+          echo "- All tests must pass before merge" >> README.md
+          echo "- Security scans with Trivy and TfSec" >> README.md
+          echo "- Infrastructure tests with Terratest" >> README.md
+          echo "" >> README.md
+          
+          # Footer with dynamic stats
+          echo "---" >> README.md
+          echo "" >> README.md
+          echo "### 📊 Project Stats" >> README.md
+          MODULE_COUNT=$(ls modules/ 2>/dev/null | wc -l)
+          ENV_COUNT=$(ls environments/ 2>/dev/null | wc -l)
+          echo "- **Modules**: $MODULE_COUNT infrastructure modules" >> README.md
+          echo "- **Environments**: $ENV_COUNT deployment environments" >> README.md
+          
+          # Try to get app name from package.json
+          if [ -f "local-docker/app/package.json" ]; then
+            APP_NAME=$(node -pe "require('./local-docker/app/package.json').name || 'docker-express-nodejs-app'" 2>/dev/null || echo "docker-express-nodejs-app")
+            echo "- **Application**: $APP_NAME" >> README.md
+          else
+            echo "- **Application**: docker-express-nodejs-app" >> README.md
+          fi
+
+          echo "" >> README.md
+          echo "**🤖 Auto-generated on:** \`$(date)\`" >> README.md
+          echo "**📋 Last updated by:** GitHub Actions Bot" >> README.md
+
+      - name: Commit README
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          
+          if git diff --exit-code README.md; then
+            echo "📄 No changes to README.md"
+            exit 0
+          fi
+          
+          git add README.md
+          git commit -m "docs: auto-update README [skip ci]"
+          git remote set-url origin https://x-access-token:${{ secrets.DEPLOYMENT_TOKEN }}@github.com/${{ github.repository }}.git
+          git push origin HEAD
+          
+          echo "✅ Documentation updated successfully"
+
+      - name: Create documentation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-documentation
+          path: README.md
+          retention-days: 7
