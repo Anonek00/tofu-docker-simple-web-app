@@ -1,4 +1,4 @@
-# Anonek00/simple-tofu-docker-web-app
+# Anonek00/tofu-docker-simple-web-app
 
 🏗️ **Infrastructure as Code** project using **OpenTofu** for AWS infrastructure provisioning and **Docker** for containerized Node.js Express application with monitoring deployment.
 
@@ -34,11 +34,11 @@ AWS infrastructure module for vpc resources
 ## ⚙️ Requirements & Prerequisites
 
 ### System Requirements:
-- **OpenTofu**: `>= 1.10.0`
-- **Docker**: `>= 28.3.2`
-- **Docker Compose**: `>= 2.39.1`
-- **AWS CLI**: `>= 2.28.13` (for AWS authentication)
-- **Python**: `>=3.13.7` (for AWS CLI)
+- **OpenTofu**: `>= 1.0`
+- **Docker**: `>= 28.0.4`
+- **Docker Compose**: `>= 2.38.2`
+- **AWS CLI**: `>= 2.28.12` (for AWS authentication)
+- **Python**: `>=3.12.3` (for AWS CLI)
 - **Git**: Latest version
 
 ### AWS Authentication:
@@ -55,8 +55,8 @@ export AWS_DEFAULT_REGION="us-central-1"
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/Anonek00/simple-tofu-docker-web-app.git
-cd simple-tofu-docker-web-app
+git clone https://github.com/Anonek00/tofu-docker-simple-web-app.git
+cd tofu-docker-simple-web-app
 ```
 
 ### 2. Start the Application Stack
@@ -122,7 +122,6 @@ ssh -i ~/.ssh/proper_key_for_auth proper_user_name@EC2_INSTANCE_IP 'ls -la /opt/
 
 #Build & run application with docker compose as service user
 ssh -i ~/.ssh/proper_key_for_auth proper_user_name@EC2_INSTANCE_IP 'sudo -u nodeapp bash -c "cd /opt/node-composed/local-docker/app && docker compose up --build -d"'
-
 ```
 
 ## 🔥 Infrastructure Destruction
@@ -296,7 +295,7 @@ This project implements a **modern DevOps pipeline** with the following key comp
 
 #### 🔄 **Sequential Pipeline with Strategic Parallelization**
 ```
-validate-environments (matrix: dev,stage,prod) → docker-build-test → generate-docs → summary
+validate-environments (matrix: dev,stage,prod) → docker-build-test → summary → generate-docs
 ```
 - **Fail fast** - validate infrastructure before expensive builds
 - **Resource optimization** - parallel environment validation
@@ -313,13 +312,11 @@ validate-environments (matrix: dev,stage,prod) → docker-build-test → generat
 - **Consistency** - standardized structure across projects
 
 ### AWS Infra desired structure
+  <img src='.github/AWS_Infra_diagram.svg' alt='AWS Diagram' style='max-width: 100%; height: auto;'' />
 
-  <img src=".github/AWS_Infra_diagram.svg" alt="AWS Diagram" style="max-width: 100%; height: auto;" />
 
 ### Docker application structure
-
-  <img src=".github/Docker-compose_diagram.svg" alt="Docker Compose structure Diagram" style="max-width: 100%; height: auto;" />
-
+  <img src='.github/Docker-compose_diagram.svg' alt='Docker Compose structure Diagram' style='max-width: 100%; height: auto;'' />
 
 ## 🔄 CI/CD Pipeline
 
@@ -347,3 +344,6 @@ The project uses **GitHub Actions** for automated CI/CD:
 - **Modules**: 3 infrastructure modules
 - **Environments**: 3 deployment environments
 - **Application**: docker-express-nodejs-app
+
+**🤖 Auto-generated on:** `Mon Aug 25 19:49:26 UTC 2025`
+**📋 Last updated by:** GitHub Actions Bot
