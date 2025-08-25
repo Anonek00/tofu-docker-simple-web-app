@@ -75,6 +75,12 @@ jobs:
           
           echo "${{ matrix.environment }} validated successfully"
 
+      - name: Security scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: environments/${{ matrix.environment }}
+          soft_fail: true
+
 
   # JOB 2: DOCKER BUILD AND TEST WITH COMPOSE
   docker-build-test:
