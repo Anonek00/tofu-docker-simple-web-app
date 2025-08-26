@@ -86,7 +86,7 @@ jobs:
   docker-build-test:
     name: Docker Build & Integration Test
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -117,96 +117,104 @@ jobs:
       - name: Generate MySQL init.sql from template
         working-directory: ./local-docker/mysql
         run: |
-
           echo "Generating init.sql"
           envsubst < init.sql.template > init.sql
 
-      # Full stack test with docker-compose to fix issues with connecting to database
       - name: Test application with docker-compose
         working-directory: ./local-docker/app
+        env:
+          CURL_MAX_ATTEMPTS: 10
+          CURL_RETRY_DELAY: 5
         run: |
+          set -euo pipefail
+
           echo "Testing complete application stack..."
-          
-          # Build and run whole stack in background
           docker compose up --build -d
-          
-          # Wait for all services to start
+
           echo "Waiting for services to start..."
-          sleep 30
-          
-          # Check all containers status
-          echo "Checking container status..."
-          docker compose ps
-          
-          # Check if all containers are working
-          if ! docker compose ps | grep -E "(Up|healthy)"; then
-            echo "Some containers failed to start"
-            echo "Logs from failed containers:"
-            docker compose logs
-            exit 1
-          fi
-          
-          # Test health check
-          echo "Testing application health..."
-          max_attempts=10
+          sleep 10
+
+          # Capture initial status
+          echo "Capturing container status..."
+          docker compose ps > ../../compose-ps.txt || true
+
+          # App health with retries
+          echo "Testing application health endpoint with retries..."
           attempt=1
-          
-          while [ $attempt -le $max_attempts ]; do
-            if curl -f http://localhost:3500/health; then
-              echo "Application health check passed"
+          HEALTH_OK=0
+          : > ../../curl_health_attempts.log
+          while [ $attempt -le ${CURL_MAX_ATTEMPTS} ]; do
+            HTTP_CODE=$(curl -s -o /tmp/health_body.txt -w "%{http_code}" http://localhost:3500/health || echo "000")
+            curl -s -o /dev/null -w "time_namelookup=%{time_namelookup} time_connect=%{time_connect} time_starttransfer=%{time_starttransfer} time_total=%{time_total}\n" http://localhost:3500/health >> ../../curl_health_attempts.log || true
+            if [ "$HTTP_CODE" = "200" ]; then
+              HEALTH_OK=1
               break
             else
-              echo "Attempt $attempt/$max_attempts failed, waiting 5s..."
-              sleep 5
+              echo "Attempt $attempt/${CURL_MAX_ATTEMPTS} failed (HTTP $HTTP_CODE), waiting ${CURL_RETRY_DELAY}s..."
+              sleep ${CURL_RETRY_DELAY}
               attempt=$((attempt + 1))
             fi
           done
-          
-          if [ $attempt -gt $max_attempts ]; then
-            echo "Application health check failed after $max_attempts attempts"
-            echo "Application logs:"
-            docker compose logs webapp
+
+          if [ $HEALTH_OK -ne 1 ]; then
+            echo "Application health check failed after ${CURL_MAX_ATTEMPTS} attempts"
+            docker compose logs > ../../compose-logs.txt || true
             exit 1
           fi
-          
-          # Basic endpoints testing
-          echo "Testing API endpoints..."
-          
-          # Main page test
-          if curl -f http://localhost/; then
-            echo "Main page test passed"
-          else
-            echo "Main page test failed"
-            exit 1
-          fi
-          
-          # Users endpoint test
-          if curl -f http://localhost/users; then
-            echo "Users endpoint test passed"
-          else
-            echo "Users endpoint test failed (may be expected)"
-          fi
-          
-          # Database connectivity test
+
+          # Endpoint tests
+          echo "Running endpoint tests..."
+          : > ../../endpoint_results.tsv
+
+          test_endpoint () {
+            local name="$1"
+            local url="$2"
+            local http_code time_total
+            http_code=$(curl -s -o /tmp/endpoint_body.txt -w "%{http_code}" "$url" || echo "000")
+            time_total=$(curl -s -o /dev/null -w "%{time_total}" "$url" || echo "0")
+            echo -e "${name}\t${url}\t${http_code}\t${time_total}" >> ../../endpoint_results.tsv
+            [ "$http_code" = "200" ]
+          }
+
+          ENDPOINTS_OK=1
+          test_endpoint "Main page" "http://localhost/" || ENDPOINTS_OK=0
+          test_endpoint "Users endpoint" "http://localhost/users" || true    # optional
+          # NEW: Grafana health via reverse proxy (/grafana)
+          # Preferowane API zdrowia Grafany: /api/health. Pod reverse proxy serwowane jako /grafana/api/health.
+          test_endpoint "Grafana health" "http://localhost/grafana/api/health" || ENDPOINTS_OK=0
+
+          # Database test
           echo "Testing database connectivity..."
-          if docker compose exec -T mysql mysql -u ${MYSQL_USER} -p${MYSQL_PASSWORD} -e "SELECT 1;"; then
-            echo "Database connectivity test passed"
+          DB_OK=1
+          if docker compose exec -T mysql mysql -u "${MYSQL_USER}" -p"${MYSQL_PASSWORD}" -e "SELECT 1;" >/dev/null 2>&1; then
+            echo "DB OK" > ../../db_status.txt
           else
-            echo "Database connectivity test failed"
-            docker compose logs mysql
-            exit 1
+            echo "DB FAIL" > ../../db_status.txt
+            DB_OK=0
+            docker compose logs mysql > ../../mysql-logs.txt || true
           fi
-          
-          # Redis connectivity test
+
+          # Redis test
           echo "Testing Redis connectivity..."
-          if docker compose exec -T redis redis-cli ping; then
-            echo "Redis connectivity test passed"
+          REDIS_OK=1
+          if docker compose exec -T redis redis-cli ping >/dev/null 2>&1; then
+            echo "REDIS OK" > ../../redis_status.txt
           else
-            echo "Redis connectivity test failed"
-            docker compose logs redis
+            echo "REDIS FAIL" > ../../redis_status.txt
+            REDIS_OK=0
+            docker compose logs redis > ../../redis-logs.txt || true
+          fi
+
+          # Save logs & inspect
+          docker compose logs > ../../compose-logs.txt || true
+          docker inspect $(docker compose ps -q || true) > ../../compose-inspect.json || true
+
+          # Fail if critical checks failed
+          if [ $ENDPOINTS_OK -ne 1 ] || [ $DB_OK -ne 1 ] || [ $REDIS_OK -ne 1 ]; then
+            echo "One or more integration checks failed"
             exit 1
           fi
-          
+
           echo "All integration tests passed!"
 
       - name: Cleanup test environment
@@ -217,7 +225,6 @@ jobs:
           docker compose down -v
           docker system prune -f
 
-      # Image security scan
       - name: Security Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -241,42 +248,107 @@ jobs:
         run: |
           echo "Logging in to GitHub Container Registry..."
           echo ${{ secrets.DEPLOYMENT_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          
+
           IMAGE_NAME="ghcr.io/anonek00/anonekoolocalenv"
           IMAGE_TAG="${{ github.sha }}"
           SHORT_TAG=${IMAGE_TAG:0:7}
-          
+
           echo "Tagging image as $IMAGE_NAME:$SHORT_TAG"
           docker tag test-app:latest $IMAGE_NAME:$SHORT_TAG
-          
+
           echo "Pushing image $IMAGE_NAME:$SHORT_TAG"
           docker push $IMAGE_NAME:$SHORT_TAG
-          
-          echo "Image pushed successfully with tag: $SHORT_TAG"
 
+          echo "Image pushed successfully with tag: $SHORT_TAG"
 
       - name: Generate Test Report
         if: always()
         run: |
-          echo "## Integration Test Results" >> test-report.md
+          set -euo pipefail
+
+          echo "## Integration Test Results" > test-report.md
           echo "" >> test-report.md
-          echo "**Test Date:** $(date)" >> test-report.md  
+          echo "**Test Date:** $(date)" >> test-report.md
           echo "**Image:** test-app:latest" >> test-report.md
           echo "" >> test-report.md
-          echo "### Tests Performed:" >> test-report.md
-          echo "- Docker Compose stack startup" >> test-report.md
-          echo "- Application health check" >> test-report.md
-          echo "- API endpoint tests" >> test-report.md
-          echo "- Database connectivity" >> test-report.md
-          echo "- Redis connectivity" >> test-report.md
-          echo "- Security vulnerability scan" >> test-report.md
 
-      - name: Upload Test Report
+          echo "### Containers Status" >> test-report.md
+          if [ -f compose-ps.txt ]; then
+            echo "" >> test-report.md
+            echo '```' >> test-report.md
+            cat compose-ps.txt >> test-report.md
+            echo '```
+          else
+            echo "- No container status captured" >> test-report.md
+          fi
+
+          echo "" >> test-report.md
+          echo "### Health Check Attempts (timings)" >> test-report.md
+          if [ -f curl_health_attempts.log ]; then
+            echo "" >> test-report.md
+            echo '```' >> test-report.md
+            tail -n 20 curl_health_attempts.log >> test-report.md
+            echo '```
+          else
+            echo "- No health timings captured" >> test-report.md
+          fi
+
+          echo "" >> test-report.md
+          echo "### Endpoint Tests" >> test-report.md
+          if [ -f endpoint_results.tsv ]; then
+            printf "| Test | URL | HTTP | Time (s) |\n|---|---|---:|---:|\n" >> test-report.md
+            while IFS=$'\t' read -r NAME URL CODE TIME; do
+              printf "| %s | %s | %s | %s |\n" "$NAME" "$URL" "$CODE" "$TIME" >> test-report.md
+            done < endpoint_results.tsv
+          else
+            echo "- No endpoint results captured" >> test-report.md
+          fi
+
+          echo "" >> test-report.md
+          echo "### Service Connectivity" >> test-report.md
+          DB_STATUS=$(test -f db_status.txt && cat db_status.txt || echo "N/A")
+          REDIS_STATUS=$(test -f redis_status.txt && cat redis_status.txt || echo "N/A")
+          echo "- Database: ${DB_STATUS}" >> test-report.md
+          echo "- Redis: ${REDIS_STATUS}" >> test-report.md
+
+          echo "" >> test-report.md
+          echo "### Security Scan Summary" >> test-report.md
+          echo "- See Trivy scan step logs for CRITICAL/HIGH findings" >> test-report.md
+
+          {
+            echo "## Docker Integration Test Summary"
+            echo ""
+            echo "- Image: test-app:latest"
+            echo "- DB: ${DB_STATUS}"
+            echo "- Redis: ${REDIS_STATUS}"
+            echo ""
+            echo "### Endpoint Results"
+            if [ -f endpoint_results.tsv ]; then
+              echo ""
+              echo "| Test | URL | HTTP | Time (s) |"
+              echo "|---|---|---:|---:|"
+              while IFS=$'\t' read -r NAME URL CODE TIME; do
+                echo "| $NAME | $URL | $CODE | $TIME |"
+              done < endpoint_results.tsv
+            else
+              echo "- No endpoint results captured"
+            fi
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Debug Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: integration-test-report
-          path: test-report.md
+          name: integration-debug-artifacts
+          path: |
+            test-report.md
+            compose-ps.txt
+            compose-logs.txt
+            compose-inspect.json
+            curl_health_attempts.log
+            endpoint_results.tsv
+            mysql-logs.txt
+            redis-logs.txt
 
 
     # JOB 3: PIPELINE SUMMARY
@@ -321,7 +393,7 @@ jobs:
           case $DOCS_STATUS in
             "success") echo "| 📚 Documentation | ✅ PASSED | README updated |" >> $GITHUB_STEP_SUMMARY ;;
             "failure") echo "| 📚 Documentation | ❌ FAILED | Documentation generation failed |" >> $GITHUB_STEP_SUMMARY ;;
-            *) echo "| 📚 Documentation | ⏭️ SKIPPED | Not main branch |" >> $GITHUB_STEP_SUMMARY ;;
+            *) echo "| 📚 Documentation | ⏭️ SKIPPED | Job was skipped |" >> $GITHUB_STEP_SUMMARY ;;
           esac
           
           echo "" >> $GITHUB_STEP_SUMMARY
