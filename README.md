@@ -336,7 +336,6 @@ The project uses **GitHub Actions** for automated CI/CD:
 ### Monitoring:
 - All tests must pass before merge
 - Security scans with Trivy and TfSec
-- Infrastructure tests with Terratest
 
 ---
 
@@ -345,5 +344,5 @@ The project uses **GitHub Actions** for automated CI/CD:
 - **Environments**: 3 deployment environments
 - **Application**: docker-express-nodejs-app
 
-**🤖 Auto-generated on:** `Mon Aug 25 19:59:04 UTC 2025`
+**🤖 Auto-generated on:** `Tue Aug 26 11:19:41 UTC 2025`
 **📋 Last updated by:** GitHub Actions Bot
